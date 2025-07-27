@@ -1,0 +1,40 @@
+{
+  "name": "goon-clicker",
+  "version": "1.0.0",
+  "description": "A React Native idle clicker game inspired by Cookie Clicker",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "eject": "expo eject"
+  },
+  "dependencies": {
+    "@expo/ngrok": "latest",
+    "@expo/vector-icons": "latest",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-navigation/native": "latest",
+    "@react-navigation/stack": "latest",
+    "expo": "latest",
+    "expo-av": "latest",
+    "expo-constants": "latest",
+    "expo-linear-gradient": "latest",
+    "expo-status-bar": "latest",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-reanimated": "~3.17.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-web": "^0.20.0"
+  },
+  "devDependencies": {
+    "@babel/core": "latest",
+    "@types/react": "~19.0.10",
+    "@types/react-native": "latest",
+    "typescript": "latest"
+  },
+  "private": true
+}

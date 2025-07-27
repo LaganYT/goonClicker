@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Goon Clicker",
+    "slug": "goon-clicker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0f0f23"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+
+    },
+    "web": {
+    },
+    "plugins": []
+  }
+} 
