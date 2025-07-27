@@ -136,7 +136,11 @@ export default function ShopScreen() {
 
     // Update stats based on upgrade type
     if (upgrade.key === 'clickPower') {
-      newGoonsPerClick = upgrade.baseMultiplier * newUpgrades[upgrade.key].level;
+      // Calculate total click power: base (1) + click power upgrades, then apply prestige multiplier
+      const baseClickPower = 1;
+      const clickPowerBonus = newUpgrades[upgrade.key].level * upgrade.baseMultiplier;
+      const totalClickPower = baseClickPower + clickPowerBonus;
+      newGoonsPerClick = Math.floor(totalClickPower * gameState.prestige.multiplier);
     } else {
       newGoonsPerSecond += upgrade.baseMultiplier;
     }

@@ -66,6 +66,11 @@ export default function App() {
     return () => clearInterval(interval);
   }, [gameState]);
 
+  // Recalculate goons per click when upgrades or prestige changes
+  useEffect(() => {
+    recalculateGoonsPerClick();
+  }, [gameState.upgrades.clickPower.level, gameState.prestige.multiplier]);
+
   const loadGameState = async () => {
     try {
       const savedState = await AsyncStorage.getItem('goonClickerState');
@@ -76,9 +81,16 @@ export default function App() {
         const timeDiff = now - parsedState.lastSaveTime;
         const offlineGoons = parsedState.goonsPerSecond * (timeDiff / 1000);
         
+        // Recalculate goons per click properly
+        const baseClickPower = 1;
+        const clickPowerBonus = parsedState.upgrades.clickPower.level * 1; // baseMultiplier is 1
+        const totalClickPower = baseClickPower + clickPowerBonus;
+        const correctGoonsPerClick = Math.floor(totalClickPower * parsedState.prestige.multiplier);
+        
         setGameState({
           ...parsedState,
           goons: parsedState.goons + offlineGoons,
+          goonsPerClick: correctGoonsPerClick,
           lastSaveTime: now,
         });
       }
@@ -174,6 +186,18 @@ export default function App() {
     updateGameState({ theme });
   };
 
+  // Function to recalculate goons per click based on current upgrades and prestige
+  const recalculateGoonsPerClick = () => {
+    const baseClickPower = 1;
+    const clickPowerBonus = gameState.upgrades.clickPower.level * 1; // baseMultiplier is 1
+    const totalClickPower = baseClickPower + clickPowerBonus;
+    const correctGoonsPerClick = Math.floor(totalClickPower * gameState.prestige.multiplier);
+    
+    if (correctGoonsPerClick !== gameState.goonsPerClick) {
+      updateGameState({ goonsPerClick: correctGoonsPerClick });
+    }
+  };
+
   return (
     <SafeAreaProvider>
       <GameContext.Provider value={{ 
@@ -188,6 +212,7 @@ export default function App() {
       }}>
         <NavigationContainer>
           <Stack.Navigator
+            id={undefined}
             initialRouteName="Game"
             screenOptions={{
               headerStyle: {
