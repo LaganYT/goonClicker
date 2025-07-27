@@ -64,8 +64,14 @@ export interface GameState {
   lastSaveTime: number;
   lastDailyReward: number;
   soundEnabled: boolean;
+  musicEnabled: boolean;
+  soundVolume: number;
+  musicVolume: number;
   vibrationEnabled: boolean;
   theme: 'dark' | 'light' | 'neon';
+  autoSaveEnabled: boolean;
+  notificationsEnabled: boolean;
+  particleEffectsEnabled: boolean;
 }
 
 export interface GameContextType {
@@ -75,6 +81,12 @@ export interface GameContextType {
   unlockAchievement: (achievementId: string) => void;
   performPrestige: () => void;
   toggleSound: () => void;
+  toggleMusic: () => void;
+  setSoundVolume: (volume: number) => void;
+  setMusicVolume: (volume: number) => void;
   toggleVibration: () => void;
+  toggleAutoSave: () => void;
+  toggleNotifications: () => void;
+  toggleParticleEffects: () => void;
   changeTheme: (theme: 'dark' | 'light' | 'neon') => void;
 } 

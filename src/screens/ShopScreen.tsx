@@ -13,6 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useGameContext } from '../context/GameContext';
 import { getEventMultiplier } from '../data/specialEvents';
+import { audioService } from '../services/AudioService';
+import { statisticsService } from '../services/StatisticsService';
+import { notificationService } from '../services/NotificationService';
 
 interface UpgradeItem {
   key: keyof typeof upgradeData;
@@ -116,9 +119,13 @@ export default function ShopScreen() {
     const cost = calculateUpgradeCost(upgrade);
     
     if (!canAffordUpgrade(upgrade)) {
+      audioService.playSoundEffect('error');
       Alert.alert('Not Enough Goons', 'You need more goons to buy this upgrade!');
       return;
     }
+
+    // Play upgrade sound effect
+    audioService.playSoundEffect('upgrade');
 
     // Haptic feedback - disabled for compatibility
     // try {
@@ -151,6 +158,13 @@ export default function ShopScreen() {
       goonsPerSecond: newGoonsPerSecond,
       upgrades: newUpgrades,
     });
+
+    // Record statistics
+    statisticsService.recordUpgradePurchase();
+    statisticsService.updateHighestStats(newGoonsPerSecond, newGoonsPerClick);
+
+    // Send notification
+    notificationService.notifyUpgrade(upgrade.name, newUpgrades[upgrade.key].level);
 
     Alert.alert('Upgrade Purchased!', `${upgrade.name} upgraded to level ${newUpgrades[upgrade.key].level}!`);
   };

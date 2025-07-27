@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useGameContext } from '../context/GameContext';
 import { GameState } from '../types/GameTypes';
 import { getNewAchievements } from '../data/achievements';
+import { audioService } from '../services/AudioService';
+import { statisticsService } from '../services/StatisticsService';
+import { notificationService } from '../services/NotificationService';
+import ParticleSystem from '../components/ParticleSystem';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,12 +28,26 @@ export default function GameScreen() {
   const { gameState, updateGameState, unlockAchievement } = useGameContext();
   const [scaleAnim] = useState(new Animated.Value(1));
   const [floatingTexts, setFloatingTexts] = useState<Array<{
-    id: number;
+    id: string;
     text: string;
     x: number;
     y: number;
     opacity: Animated.Value;
   }>>([]);
+  const [particleTrigger, setParticleTrigger] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const floatingTextCounter = useRef(0);
+
+  useEffect(() => {
+    const updateNotificationCount = () => {
+      setNotificationCount(notificationService.getUnreadCount());
+    };
+    
+    updateNotificationCount();
+    const interval = setInterval(updateNotificationCount, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-clicker effect
   useEffect(() => {
@@ -46,6 +64,12 @@ export default function GameScreen() {
   }, [gameState.goonsPerSecond]);
 
   const handleGoonClick = () => {
+    // Play click sound effect
+    audioService.playSoundEffect('click');
+
+    // Trigger particle effects
+    setParticleTrigger(true);
+
     // Haptic feedback - disabled for compatibility
     // try {
     //   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -78,6 +102,11 @@ export default function GameScreen() {
       totalClicks: newTotalClicks,
     });
 
+    // Record statistics
+    statisticsService.recordClick();
+    statisticsService.recordGoonsEarned(gameState.goonsPerClick);
+    statisticsService.updateHighestStats(gameState.goonsPerSecond, gameState.goonsPerClick);
+
     // Check for new achievements
     const newAchievements = getNewAchievements({
       ...gameState,
@@ -88,11 +117,13 @@ export default function GameScreen() {
     
     newAchievements.forEach(achievement => {
       unlockAchievement(achievement.id);
+      audioService.playSoundEffect('achievement');
+      statisticsService.recordAchievement();
     });
 
     // Create floating text
     const newFloatingText = {
-      id: Date.now(),
+      id: `${Date.now()}-${floatingTextCounter.current++}-${Math.random().toString(36).substr(2, 9)}`,
       text: `+${gameState.goonsPerClick}`,
       x: Math.random() * (width - 100) + 50,
       y: height * 0.4,
@@ -138,6 +169,19 @@ export default function GameScreen() {
           <Text style={styles.statLabel}>Per Click</Text>
           <Text style={styles.statValue}>{formatNumber(gameState.goonsPerClick)}</Text>
         </View>
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={() => navigation.navigate('Notifications' as never)}
+        >
+          <Ionicons name="notifications" size={24} color="#fff" />
+          {notificationCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {notificationCount > 99 ? '99+' : notificationCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Main Goon Button */}
@@ -175,6 +219,13 @@ export default function GameScreen() {
           {text.text}
         </Animated.Text>
       ))}
+
+      {/* Particle System */}
+      <ParticleSystem
+        enabled={gameState.particleEffectsEnabled}
+        trigger={particleTrigger}
+        onTriggerComplete={() => setParticleTrigger(false)}
+      />
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
@@ -312,5 +363,32 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  notificationButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 }); 

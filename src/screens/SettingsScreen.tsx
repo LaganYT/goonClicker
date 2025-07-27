@@ -8,16 +8,25 @@ import {
   Switch,
   Alert,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useGameContext } from '../context/GameContext';
+import { audioService } from '../services/AudioService';
+import { notificationService } from '../services/NotificationService';
 
 export default function SettingsScreen() {
   const { 
     gameState, 
     toggleSound, 
+    toggleMusic,
+    setSoundVolume,
+    setMusicVolume,
     toggleVibration, 
+    toggleAutoSave,
+    toggleNotifications,
+    toggleParticleEffects,
     changeTheme,
     performPrestige 
   } = useGameContext();
@@ -46,6 +55,26 @@ export default function SettingsScreen() {
         `You need ${formatNumber(gameState.prestige.goonsRequired)} goons to prestige.`
       );
     }
+  };
+
+  const handleToggleSound = () => {
+    console.log('Toggle sound called, current state:', gameState.soundEnabled);
+    toggleSound();
+  };
+
+  const handleToggleMusic = () => {
+    console.log('Toggle music called, current state:', gameState.musicEnabled);
+    toggleMusic();
+  };
+
+  const handleSetSoundVolume = (volume: number) => {
+    console.log('Set sound volume called:', volume);
+    setSoundVolume(volume);
+  };
+
+  const handleSetMusicVolume = (volume: number) => {
+    console.log('Set music volume called:', volume);
+    setMusicVolume(volume);
   };
 
   const renderSettingItem = (
@@ -100,12 +129,24 @@ export default function SettingsScreen() {
             {renderSettingItem(
               'volume-high',
               'Sound Effects',
-              'Enable sound effects and music',
+              'Enable sound effects',
               <Switch
                 value={gameState.soundEnabled}
-                onValueChange={toggleSound}
+                onValueChange={handleToggleSound}
                 trackColor={{ false: '#666', true: '#4CAF50' }}
                 thumbColor={gameState.soundEnabled ? '#fff' : '#ccc'}
+              />
+            )}
+
+            {renderSettingItem(
+              'musical-notes',
+              'Background Music',
+              'Enable background music',
+              <Switch
+                value={gameState.musicEnabled}
+                onValueChange={handleToggleMusic}
+                trackColor={{ false: '#666', true: '#4CAF50' }}
+                thumbColor={gameState.musicEnabled ? '#fff' : '#ccc'}
               />
             )}
 
@@ -120,6 +161,83 @@ export default function SettingsScreen() {
                 thumbColor={gameState.vibrationEnabled ? '#fff' : '#ccc'}
               />
             )}
+
+            {renderSettingItem(
+              'save',
+              'Auto Save',
+              'Automatically save game progress',
+              <Switch
+                value={gameState.autoSaveEnabled}
+                onValueChange={toggleAutoSave}
+                trackColor={{ false: '#666', true: '#4CAF50' }}
+                thumbColor={gameState.autoSaveEnabled ? '#fff' : '#ccc'}
+              />
+            )}
+
+            {renderSettingItem(
+              'notifications',
+              'Notifications',
+              'Enable push notifications',
+              <Switch
+                value={gameState.notificationsEnabled}
+                onValueChange={toggleNotifications}
+                trackColor={{ false: '#666', true: '#4CAF50' }}
+                thumbColor={gameState.notificationsEnabled ? '#fff' : '#ccc'}
+              />
+            )}
+
+            {renderSettingItem(
+              'sparkles',
+              'Particle Effects',
+              'Enable visual particle effects',
+              <Switch
+                value={gameState.particleEffectsEnabled}
+                onValueChange={toggleParticleEffects}
+                trackColor={{ false: '#666', true: '#4CAF50' }}
+                thumbColor={gameState.particleEffectsEnabled ? '#fff' : '#ccc'}
+              />
+            )}
+
+            {/* Volume Controls */}
+            <View style={styles.settingItem}>
+              <View style={styles.settingIcon}>
+                <Ionicons name="volume-high" size={24} color="#fff" />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Sound Volume</Text>
+                <Text style={styles.settingSubtitle}>Adjust sound effects volume</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={1}
+                  value={gameState.soundVolume}
+                  onValueChange={handleSetSoundVolume}
+                  minimumTrackTintColor="#4CAF50"
+                  maximumTrackTintColor="#666"
+                  thumbTintColor="#fff"
+                />
+              </View>
+            </View>
+
+            <View style={styles.settingItem}>
+              <View style={styles.settingIcon}>
+                <Ionicons name="musical-notes" size={24} color="#fff" />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Music Volume</Text>
+                <Text style={styles.settingSubtitle}>Adjust background music volume</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={1}
+                  value={gameState.musicVolume}
+                  onValueChange={handleSetMusicVolume}
+                  minimumTrackTintColor="#4CAF50"
+                  maximumTrackTintColor="#666"
+                  thumbTintColor="#fff"
+                />
+              </View>
+            </View>
 
             <View style={styles.settingItem}>
               <View style={styles.settingIcon}>
@@ -212,6 +330,46 @@ export default function SettingsScreen() {
               'Built with React Native & Expo',
               <Text style={styles.infoText}>React Native</Text>
             )}
+          </View>
+
+          {/* Test Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Test Audio (Simplified)</Text>
+            
+            <Text style={styles.infoText}>
+              Audio system is working with simplified implementation. 
+              Check console for audio logs.
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={() => {
+                console.log('Testing audio...');
+                audioService.playSoundEffect('click');
+              }}
+            >
+              <Text style={styles.testButtonText}>Test Click Sound</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={() => {
+                console.log('Testing upgrade sound...');
+                audioService.playSoundEffect('upgrade');
+              }}
+            >
+              <Text style={styles.testButtonText}>Test Upgrade Sound</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={() => {
+                console.log('Testing background music...');
+                audioService.playBackgroundMusic();
+              }}
+            >
+              <Text style={styles.testButtonText}>Test Background Music</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -370,6 +528,24 @@ const styles = StyleSheet.create({
   prestigeButtonText: {
     color: '#9b59b6',
     fontSize: 14,
+    fontWeight: 'bold',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+    marginTop: 10,
+  },
+  testButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 }); 

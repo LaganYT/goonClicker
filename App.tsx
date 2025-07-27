@@ -11,11 +11,15 @@ import StatsScreen from './src/screens/StatsScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
 import DailyRewardsScreen from './src/screens/DailyRewardsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 import { GameContext } from './src/context/GameContext';
 import { GameState } from './src/types/GameTypes';
 import { ACHIEVEMENTS, getUnlockedAchievements, getNewAchievements } from './src/data/achievements';
 import { generateDailyRewards, getCurrentDay, canClaimDailyReward } from './src/data/dailyRewards';
 import { SPECIAL_EVENTS, updateEventStatus, getEventMultiplier } from './src/data/specialEvents';
+import { audioService } from './src/services/AudioService';
+import { statisticsService } from './src/services/StatisticsService';
+import { notificationService } from './src/services/NotificationService';
 
 const Stack = createStackNavigator();
 
@@ -48,14 +52,45 @@ export default function App() {
     lastSaveTime: Date.now(),
     lastDailyReward: 0,
     soundEnabled: true,
+    musicEnabled: true,
+    soundVolume: 0.7,
+    musicVolume: 0.5,
     vibrationEnabled: true,
     theme: 'dark',
+    autoSaveEnabled: true,
+    notificationsEnabled: true,
+    particleEffectsEnabled: true,
   });
 
-  // Load game state from storage
+  // Load game state from storage and initialize audio
   useEffect(() => {
     loadGameState();
+    initializeAudio();
+    statisticsService.startSession();
+    
+    return () => {
+      audioService.cleanup();
+      statisticsService.endSession();
+    };
   }, []);
+
+  const initializeAudio = async () => {
+    try {
+      console.log('Initializing audio system...');
+      await audioService.preloadSoundEffects();
+      await audioService.loadBackgroundMusic();
+      audioService.setInitialized();
+      
+      // Start background music if enabled
+      if (gameState.musicEnabled) {
+        await audioService.playBackgroundMusic();
+      }
+      
+      console.log('Audio system initialized successfully');
+    } catch (error) {
+      console.log('Error initializing audio:', error);
+    }
+  };
 
   // Save game state periodically
   useEffect(() => {
@@ -119,6 +154,9 @@ export default function App() {
     if (currentDay === day) {
       const reward = gameState.dailyRewards.find(r => r.day === day);
       if (reward && !reward.claimed) {
+        // Play reward sound effect
+        audioService.playSoundEffect('reward');
+        
         const newDailyRewards = gameState.dailyRewards.map(r => 
           r.day === day ? { ...r, claimed: true } : r
         );
@@ -128,6 +166,8 @@ export default function App() {
           dailyRewards: newDailyRewards,
           lastDailyReward: Date.now(),
         });
+        statisticsService.recordDailyReward();
+        notificationService.notifyDailyReward(day, reward.reward + reward.bonus);
       }
     }
   };
@@ -140,11 +180,16 @@ export default function App() {
         achievements: newAchievements,
         goons: gameState.goons + achievement.reward,
       });
+      statisticsService.recordAchievement();
+      notificationService.notifyAchievement(achievement.name, achievement.reward);
     }
   };
 
   const performPrestige = () => {
     if (gameState.goons >= gameState.prestige.goonsRequired) {
+      // Play prestige sound effect
+      audioService.playSoundEffect('prestige');
+      
       const prestigeMultiplier = Math.floor(Math.log10(gameState.goons / gameState.prestige.goonsRequired)) + 1;
       const eventMultiplier = getEventMultiplier(gameState.specialEvents, 'prestige');
       
@@ -171,15 +216,53 @@ export default function App() {
           goonsRequired: gameState.prestige.goonsRequired * 10,
         },
       });
+      statisticsService.recordPrestige();
+      notificationService.notifyPrestige(gameState.prestige.level + 1, gameState.prestige.multiplier + (prestigeMultiplier * eventMultiplier));
     }
   };
 
   const toggleSound = () => {
-    updateGameState({ soundEnabled: !gameState.soundEnabled });
+    const newSoundEnabled = !gameState.soundEnabled;
+    console.log('App: Toggling sound from', gameState.soundEnabled, 'to', newSoundEnabled);
+    updateGameState({ soundEnabled: newSoundEnabled });
+    audioService.updateSettings({ soundEnabled: newSoundEnabled });
+  };
+
+  const toggleMusic = () => {
+    const newMusicEnabled = !gameState.musicEnabled;
+    console.log('App: Toggling music from', gameState.musicEnabled, 'to', newMusicEnabled);
+    updateGameState({ musicEnabled: newMusicEnabled });
+    audioService.updateSettings({ musicEnabled: newMusicEnabled });
+  };
+
+  const setSoundVolume = (volume: number) => {
+    console.log('App: Setting sound volume to', volume);
+    updateGameState({ soundVolume: volume });
+    audioService.updateSettings({ soundVolume: volume });
+  };
+
+  const setMusicVolume = (volume: number) => {
+    console.log('App: Setting music volume to', volume);
+    updateGameState({ musicVolume: volume });
+    audioService.updateSettings({ musicVolume: volume });
   };
 
   const toggleVibration = () => {
     updateGameState({ vibrationEnabled: !gameState.vibrationEnabled });
+  };
+
+  const toggleAutoSave = () => {
+    updateGameState({ autoSaveEnabled: !gameState.autoSaveEnabled });
+  };
+
+  const toggleNotifications = () => {
+    const newNotificationsEnabled = !gameState.notificationsEnabled;
+    updateGameState({ notificationsEnabled: newNotificationsEnabled });
+    notificationService.setEnabled(newNotificationsEnabled);
+  };
+
+  const toggleParticleEffects = () => {
+    updateGameState({ particleEffectsEnabled: !gameState.particleEffectsEnabled });
   };
 
   const changeTheme = (theme: 'dark' | 'light' | 'neon') => {
@@ -207,7 +290,13 @@ export default function App() {
         unlockAchievement, 
         performPrestige,
         toggleSound,
+        toggleMusic,
+        setSoundVolume,
+        setMusicVolume,
         toggleVibration,
+        toggleAutoSave,
+        toggleNotifications,
+        toggleParticleEffects,
         changeTheme
       }}>
         <NavigationContainer>
@@ -253,6 +342,11 @@ export default function App() {
               name="Settings" 
               component={SettingsScreen} 
               options={{ title: 'Settings' }}
+            />
+            <Stack.Screen 
+              name="Notifications" 
+              component={NotificationsScreen} 
+              options={{ title: 'Notifications' }}
             />
           </Stack.Navigator>
         </NavigationContainer>

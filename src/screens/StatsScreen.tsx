@@ -11,9 +11,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useGameContext } from '../context/GameContext';
 import { getActiveEvents } from '../data/specialEvents';
+import { statisticsService } from '../services/StatisticsService';
 
 export default function StatsScreen() {
   const { gameState } = useGameContext();
+  const stats = statisticsService.getStats();
 
   const formatNumber = (num: number): string => {
     if (num >= 1e12) return `${(num / 1e12).toFixed(1)}T`;
@@ -21,30 +23,6 @@ export default function StatsScreen() {
     if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
     if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
     return Math.floor(num).toString();
-  };
-
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    } else {
-      return `${secs}s`;
-    }
-  };
-
-  const calculatePlayTime = (): number => {
-    // This is a simplified calculation - in a real app you'd track actual play time
-    return Math.floor(gameState.totalClicks * 0.5); // Assume 0.5 seconds per click on average
-  };
-
-  const calculateClickRate = (): number => {
-    if (calculatePlayTime() === 0) return 0;
-    return gameState.totalClicks / (calculatePlayTime() / 60); // clicks per minute
   };
 
   const renderStatCard = (title: string, value: string, icon: string, color: string) => (
@@ -119,9 +97,21 @@ export default function StatsScreen() {
               )}
               {renderStatCard(
                 'Play Time',
-                formatTime(calculatePlayTime()),
+                statisticsService.formatPlayTime(stats.totalPlayTime),
                 'time-outline',
                 '#e74c3c'
+              )}
+              {renderStatCard(
+                'Sessions',
+                stats.sessionsPlayed.toString(),
+                'game-controller-outline',
+                '#f39c12'
+              )}
+              {renderStatCard(
+                'Upgrades',
+                stats.totalUpgradesPurchased.toString(),
+                'trending-up-outline',
+                '#27ae60'
               )}
             </View>
           </View>
@@ -133,15 +123,29 @@ export default function StatsScreen() {
               <View style={styles.performanceItem}>
                 <Text style={styles.performanceLabel}>Click Rate</Text>
                 <Text style={styles.performanceValue}>
-                  {calculateClickRate().toFixed(1)} clicks/min
+                  {stats.averageClicksPerMinute.toFixed(1)} clicks/min
                 </Text>
               </View>
               <View style={styles.performanceItem}>
                 <Text style={styles.performanceLabel}>Efficiency</Text>
                 <Text style={styles.performanceValue}>
-                  {gameState.totalGoonsEarned > 0 
-                    ? ((gameState.totalGoonsEarned / gameState.totalClicks) * 100).toFixed(1)
+                  {stats.clickEfficiency > 0 
+                    ? (stats.clickEfficiency * 100).toFixed(1)
                     : '0'}%
+                </Text>
+              </View>
+              <View style={styles.performanceItem}>
+                <Text style={styles.performanceLabel}>Fastest Prestige</Text>
+                <Text style={styles.performanceValue}>
+                  {stats.fastestPrestige > 0 
+                    ? statisticsService.formatTime(stats.fastestPrestige)
+                    : 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.performanceItem}>
+                <Text style={styles.performanceLabel}>Daily Rewards</Text>
+                <Text style={styles.performanceValue}>
+                  {stats.totalDailyRewards}
                 </Text>
               </View>
             </View>
