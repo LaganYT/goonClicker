@@ -13,13 +13,11 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.goon-clicker"
     },
-    "android": {
-
-    },
-    "web": {
-    },
+    "android": {},
+    "web": {},
     "plugins": []
   }
-} 
+}

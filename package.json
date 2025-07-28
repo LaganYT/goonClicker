@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "eject": "expo eject"
   },
@@ -18,6 +18,7 @@
     "@react-navigation/native": "latest",
     "@react-navigation/stack": "latest",
     "expo": "latest",
+    "expo-av": "~15.1.7",
     "expo-constants": "latest",
     "expo-linear-gradient": "latest",
     "expo-status-bar": "latest",
@@ -28,7 +29,8 @@
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
-    "react-native-web": "^0.20.0"
+    "react-native-web": "^0.20.0",
+    "@expo/metro-runtime": "~5.0.4"
   },
   "devDependencies": {
     "@babel/core": "latest",

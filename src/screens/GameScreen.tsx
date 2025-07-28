@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useGameContext } from '../context/GameContext';
+import { useTheme } from '../hooks/useTheme';
 import { GameState } from '../types/GameTypes';
 import { getNewAchievements } from '../data/achievements';
 import { audioService } from '../services/AudioService';
@@ -26,6 +27,7 @@ const { width, height } = Dimensions.get('window');
 export default function GameScreen() {
   const navigation = useNavigation();
   const { gameState, updateGameState, unlockAchievement } = useGameContext();
+  const { colors } = useTheme();
   const [scaleAnim] = useState(new Animated.Value(1));
   const [floatingTexts, setFloatingTexts] = useState<Array<{
     id: string;
@@ -102,44 +104,36 @@ export default function GameScreen() {
       totalClicks: newTotalClicks,
     });
 
-    // Record statistics
-    statisticsService.recordClick();
-    statisticsService.recordGoonsEarned(gameState.goonsPerClick);
-    statisticsService.updateHighestStats(gameState.goonsPerSecond, gameState.goonsPerClick);
-
-    // Check for new achievements
-    const newAchievements = getNewAchievements({
-      ...gameState,
-      goons: newGoons,
-      totalGoonsEarned: newTotalGoonsEarned,
-      totalClicks: newTotalClicks,
-    });
-    
-    newAchievements.forEach(achievement => {
-      unlockAchievement(achievement.id);
-      audioService.playSoundEffect('achievement');
-      statisticsService.recordAchievement();
-    });
-
     // Create floating text
-    const newFloatingText = {
-      id: `${Date.now()}-${floatingTextCounter.current++}-${Math.random().toString(36).substr(2, 9)}`,
+    const floatingText = {
+      id: `floating-${floatingTextCounter.current++}`,
       text: `+${gameState.goonsPerClick}`,
       x: Math.random() * (width - 100) + 50,
       y: height * 0.4,
       opacity: new Animated.Value(1),
     };
 
-    setFloatingTexts(prev => [...prev, newFloatingText]);
+    setFloatingTexts(prev => [...prev, floatingText]);
 
     // Animate floating text
-    Animated.timing(newFloatingText.opacity, {
-      toValue: 0,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start(() => {
-      setFloatingTexts(prev => prev.filter(text => text.id !== newFloatingText.id));
+    Animated.sequence([
+      Animated.timing(floatingText.opacity, {
+        toValue: 0,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setFloatingTexts(prev => prev.filter(text => text.id !== floatingText.id));
     });
+
+    // Check for achievements
+    const newAchievements = getNewAchievements(gameState);
+    newAchievements.forEach(achievement => {
+      unlockAchievement(achievement.id);
+    });
+
+    // Update statistics
+    statisticsService.recordClick();
   };
 
   const formatNumber = (num: number): string => {
@@ -150,123 +144,141 @@ export default function GameScreen() {
     return Math.floor(num).toString();
   };
 
+  const getGradientColors = (): [string, string, string] => {
+    switch (gameState.theme) {
+      case 'light':
+        return ['#ffffff', '#f5f5f5', '#e0e0e0'];
+      case 'neon':
+        return ['#0a0a0a', '#1a1a2e', '#16213e'];
+      default:
+        return ['#0f0f23', '#1a1a2e', '#16213e'];
+    }
+  };
+
   return (
     <LinearGradient
-      colors={['#0f0f23', '#1a1a2e', '#16213e']}
+      colors={getGradientColors()}
       style={styles.container}
     >
-      {/* Header Stats */}
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.statContainer}>
-          <Text style={styles.statLabel}>Goons</Text>
-          <Text style={styles.statValue}>{formatNumber(gameState.goons)}</Text>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.goonCount, { color: colors.text }]}>
+            {formatNumber(gameState.goons)} Goons
+          </Text>
+          <Text style={[styles.goonPerSecond, { color: colors.textSecondary }]}>
+            {formatNumber(gameState.goonsPerSecond)}/s
+          </Text>
         </View>
-        <View style={styles.statContainer}>
-          <Text style={styles.statLabel}>Per Second</Text>
-          <Text style={styles.statValue}>{formatNumber(gameState.goonsPerSecond)}</Text>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: colors.surface }]}
+            onPress={() => navigation.navigate('Notifications' as never)}
+          >
+            <Ionicons name="notifications" size={24} color={colors.text} />
+            {notificationCount > 0 && (
+              <View style={[styles.notificationBadge, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.notificationBadgeText, { color: colors.text }]}>
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: colors.surface }]}
+            onPress={() => navigation.navigate('Settings' as never)}
+          >
+            <Ionicons name="settings" size={24} color={colors.text} />
+          </TouchableOpacity>
         </View>
-        <View style={styles.statContainer}>
-          <Text style={styles.statLabel}>Per Click</Text>
-          <Text style={styles.statValue}>{formatNumber(gameState.goonsPerClick)}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={() => navigation.navigate('Notifications' as never)}
-        >
-          <Ionicons name="notifications" size={24} color="#fff" />
-          {notificationCount > 0 && (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>
-                {notificationCount > 99 ? '99+' : notificationCount}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
       </View>
 
-      {/* Main Goon Button */}
-      <View style={styles.buttonContainer}>
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      {/* Main Game Area */}
+      <View style={styles.gameArea}>
+        {/* Floating Text */}
+        {floatingTexts.map(text => (
+          <Animated.Text
+            key={text.id}
+            style={[
+              styles.floatingText,
+              {
+                left: text.x,
+                top: text.y,
+                opacity: text.opacity,
+                color: colors.accent,
+              },
+            ]}
+          >
+            {text.text}
+          </Animated.Text>
+        ))}
+
+        {/* Particle System */}
+        {gameState.particleEffectsEnabled && (
+          <ParticleSystem
+            enabled={gameState.particleEffectsEnabled}
+            trigger={particleTrigger}
+            onTriggerComplete={() => setParticleTrigger(false)}
+          />
+        )}
+        {/* Main Click Button */}
+        <Animated.View style={[styles.clickButtonContainer, { transform: [{ scale: scaleAnim }] }]}>
           <TouchableOpacity
-            style={styles.goonButton}
+            style={[styles.clickButton, { backgroundColor: colors.accent }]}
             onPress={handleGoonClick}
             activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={['#ff6b6b', '#ee5a24', '#ff3838']}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.goonButtonText}>GOON</Text>
-              <Text style={styles.clickHint}>Tap to earn goons!</Text>
-            </LinearGradient>
+            <Text style={[styles.clickButtonText, { color: colors.text }]}>
+              Click for {formatNumber(gameState.goonsPerClick)} Goons
+            </Text>
           </TouchableOpacity>
         </Animated.View>
+
+        {/* Stats Display */}
+        <View style={styles.statsContainer}>
+          <Text style={[styles.statsText, { color: colors.textSecondary }]}>
+            Total Clicks: {formatNumber(gameState.totalClicks)}
+          </Text>
+          <Text style={[styles.statsText, { color: colors.textSecondary }]}>
+            Total Earned: {formatNumber(gameState.totalGoonsEarned)}
+          </Text>
+        </View>
       </View>
 
-      {/* Floating Text Animations */}
-      {floatingTexts.map(text => (
-        <Animated.Text
-          key={text.id}
-          style={[
-            styles.floatingText,
-            {
-              left: text.x,
-              top: text.y,
-              opacity: text.opacity,
-            },
-          ]}
-        >
-          {text.text}
-        </Animated.Text>
-      ))}
-
-      {/* Particle System */}
-      <ParticleSystem
-        enabled={gameState.particleEffectsEnabled}
-        trigger={particleTrigger}
-        onTriggerComplete={() => setParticleTrigger(false)}
-      />
-
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { backgroundColor: colors.surface }]}>
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate('Shop' as never)}
         >
-          <Ionicons name="storefront-outline" size={24} color="#fff" />
-          <Text style={styles.navButtonText}>Shop</Text>
+          <Ionicons name="cart" size={24} color={colors.text} />
+          <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Shop</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate('Stats' as never)}
         >
-          <Ionicons name="stats-chart" size={24} color="#fff" />
-          <Text style={styles.navButtonText}>Stats</Text>
+          <Ionicons name="stats-chart" size={24} color={colors.text} />
+          <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Stats</Text>
         </TouchableOpacity>
-
+        
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate('Achievements' as never)}
         >
-          <Ionicons name="trophy" size={24} color="#fff" />
-          <Text style={styles.navButtonText}>Achievements</Text>
+          <Ionicons name="trophy" size={24} color={colors.text} />
+          <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Achievements</Text>
         </TouchableOpacity>
-
+        
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate('DailyRewards' as never)}
         >
-          <Ionicons name="gift" size={24} color="#fff" />
-          <Text style={styles.navButtonText}>Rewards</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate('Settings' as never)}
-        >
-          <Ionicons name="settings" size={24} color="#fff" />
-          <Text style={styles.navButtonText}>Settings</Text>
+          <Ionicons name="gift" size={24} color={colors.text} />
+          <Text style={[styles.navButtonText, { color: colors.textSecondary }]}>Rewards</Text>
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -276,119 +288,105 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 20,
-    paddingHorizontal: 20,
-  },
-  statContainer: {
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
   },
-  statLabel: {
-    color: '#a0a0a0',
-    fontSize: 12,
-    fontWeight: '600',
+  headerLeft: {
+    flex: 1,
   },
-  statValue: {
-    color: '#fff',
-    fontSize: 16,
+  goonCount: {
+    fontSize: 24,
     fontWeight: 'bold',
+  },
+  goonPerSecond: {
+    fontSize: 14,
     marginTop: 4,
   },
-  buttonContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  goonButton: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  buttonGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  goonButtonText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  clickHint: {
-    color: '#fff',
-    fontSize: 12,
-    marginTop: 8,
-    opacity: 0.8,
-  },
-  floatingText: {
-    position: 'absolute',
-    color: '#ff6b6b',
-    fontSize: 20,
-    fontWeight: 'bold',
-    zIndex: 1000,
-  },
-  bottomNav: {
+  headerRight: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingBottom: 30,
-    paddingHorizontal: 10,
-    flexWrap: 'wrap',
+    gap: 10,
   },
-  navButton: {
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    minWidth: 60,
-    maxWidth: 80,
-    marginHorizontal: 2,
-  },
-  navButtonText: {
-    color: '#fff',
-    fontSize: 10,
-    marginTop: 5,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  notificationButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
   notificationBadge: {
     position: 'absolute',
     top: -5,
     right: -5,
-    backgroundColor: '#ff6b6b',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 4,
   },
   notificationBadgeText: {
-    color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  gameArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  floatingText: {
+    position: 'absolute',
+    fontSize: 18,
+    fontWeight: 'bold',
+    zIndex: 1000,
+  },
+  clickButtonContainer: {
+    alignItems: 'center',
+  },
+  clickButton: {
+    paddingHorizontal: 40,
+    paddingVertical: 20,
+    borderRadius: 50,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  clickButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  statsContainer: {
+    position: 'absolute',
+    bottom: 100,
+    alignItems: 'center',
+  },
+  statsText: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  navButton: {
+    alignItems: 'center',
+  },
+  navButtonText: {
+    fontSize: 12,
+    marginTop: 4,
   },
 }); 

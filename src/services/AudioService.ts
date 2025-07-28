@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 
 export interface AudioSettings {
   soundEnabled: boolean;
@@ -6,6 +7,16 @@ export interface AudioSettings {
   soundVolume: number;
   musicVolume: number;
 }
+
+// Static mapping of sound effects to their asset files
+const SOUND_EFFECTS = {
+  click: require('../../assets/sounds/click.mp3'),
+  upgrade: require('../../assets/sounds/upgrade.mp3'),
+  achievement: require('../../assets/sounds/achievement.mp3'),
+  prestige: require('../../assets/sounds/prestige.mp3'),
+  reward: require('../../assets/sounds/reward.mp3'),
+  error: require('../../assets/sounds/error.mp3'),
+};
 
 class AudioService {
   private settings: AudioSettings = {
@@ -15,6 +26,9 @@ class AudioService {
     musicVolume: 0.5,
   };
   private isInitialized: boolean = false;
+  private soundEffects: { [key: string]: Audio.Sound } = {};
+  private backgroundMusic: Audio.Sound | null = null;
+  private isMusicPlaying: boolean = false;
 
   constructor() {
     this.loadSettings();
@@ -41,7 +55,22 @@ class AudioService {
 
   async preloadSoundEffects() {
     try {
-      console.log('Audio effects will be created on-demand');
+      console.log('Preloading sound effects...');
+      
+      // Create sound objects for each effect using the static mapping
+      for (const [effectName, soundAsset] of Object.entries(SOUND_EFFECTS)) {
+        try {
+          const { sound } = await Audio.Sound.createAsync(
+            soundAsset,
+            { shouldPlay: false }
+          );
+          this.soundEffects[effectName] = sound;
+        } catch (error) {
+          console.log(`Error loading sound effect ${effectName}:`, error);
+        }
+      }
+      
+      console.log('Sound effects preloaded successfully');
     } catch (error) {
       console.log('Error preloading sound effects:', error);
     }
@@ -49,7 +78,19 @@ class AudioService {
 
   async loadBackgroundMusic() {
     try {
-      console.log('Background music system initialized');
+      console.log('Loading background music...');
+      
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/sounds/background.mp3'),
+        { 
+          shouldPlay: false,
+          isLooping: true,
+          volume: this.settings.musicVolume
+        }
+      );
+      
+      this.backgroundMusic = sound;
+      console.log('Background music loaded successfully');
     } catch (error) {
       console.log('Error loading background music:', error);
     }
@@ -62,25 +103,32 @@ class AudioService {
     }
 
     try {
-      console.log(`Playing sound effect: ${effectName} at volume ${this.settings.soundVolume}`);
-      
-      // For now, we'll just log the sound effect
-      // In a real implementation, you would play actual audio here
-      // This avoids the native shared object issues
-      
+      const sound = this.soundEffects[effectName];
+      if (sound) {
+        await sound.setVolumeAsync(this.settings.soundVolume);
+        await sound.replayAsync();
+        console.log(`Playing sound effect: ${effectName} at volume ${this.settings.soundVolume}`);
+      } else {
+        console.log(`Sound effect ${effectName} not found`);
+      }
     } catch (error) {
       console.log(`Error playing ${effectName} sound effect:`, error);
     }
   }
 
   async playBackgroundMusic() {
-    if (!this.settings.musicEnabled) {
-      console.log('Background music disabled');
+    if (!this.settings.musicEnabled || !this.backgroundMusic) {
+      console.log('Background music disabled or not loaded');
       return;
     }
 
     try {
-      console.log(`Playing background music at volume ${this.settings.musicVolume}`);
+      if (!this.isMusicPlaying) {
+        await this.backgroundMusic.setVolumeAsync(this.settings.musicVolume);
+        await this.backgroundMusic.playAsync();
+        this.isMusicPlaying = true;
+        console.log(`Playing background music at volume ${this.settings.musicVolume}`);
+      }
     } catch (error) {
       console.log('Error playing background music:', error);
     }
@@ -88,7 +136,11 @@ class AudioService {
 
   async stopBackgroundMusic() {
     try {
-      console.log('Stopping background music');
+      if (this.backgroundMusic && this.isMusicPlaying) {
+        await this.backgroundMusic.stopAsync();
+        this.isMusicPlaying = false;
+        console.log('Stopping background music');
+      }
     } catch (error) {
       console.log('Error stopping background music:', error);
     }
@@ -96,7 +148,11 @@ class AudioService {
 
   async pauseBackgroundMusic() {
     try {
-      console.log('Pausing background music');
+      if (this.backgroundMusic && this.isMusicPlaying) {
+        await this.backgroundMusic.pauseAsync();
+        this.isMusicPlaying = false;
+        console.log('Pausing background music');
+      }
     } catch (error) {
       console.log('Error pausing background music:', error);
     }
@@ -106,6 +162,20 @@ class AudioService {
     this.settings = { ...this.settings, ...newSettings };
     await this.saveSettings();
 
+    // Update background music volume if it's playing
+    if (this.backgroundMusic && this.isMusicPlaying) {
+      try {
+        await this.backgroundMusic.setVolumeAsync(this.settings.musicVolume);
+      } catch (error) {
+        console.log('Error updating background music volume:', error);
+      }
+    }
+
+    // Stop music if disabled
+    if (!this.settings.musicEnabled && this.isMusicPlaying) {
+      await this.pauseBackgroundMusic();
+    }
+
     console.log('Audio settings updated:', this.settings);
   }
 
@@ -114,7 +184,24 @@ class AudioService {
   }
 
   async cleanup() {
-    console.log('Audio service cleanup completed');
+    try {
+      // Unload all sound effects
+      for (const sound of Object.values(this.soundEffects)) {
+        await sound.unloadAsync();
+      }
+      this.soundEffects = {};
+
+      // Unload background music
+      if (this.backgroundMusic) {
+        await this.backgroundMusic.unloadAsync();
+        this.backgroundMusic = null;
+      }
+
+      this.isMusicPlaying = false;
+      console.log('Audio service cleanup completed');
+    } catch (error) {
+      console.log('Error during audio cleanup:', error);
+    }
   }
 
   setInitialized() {

@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 
 import GameScreen from './src/screens/GameScreen';
 import ShopScreen from './src/screens/ShopScreen';
@@ -77,6 +78,23 @@ export default function App() {
   const initializeAudio = async () => {
     try {
       console.log('Initializing audio system...');
+      
+      // Request audio permissions
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Audio permission not granted');
+        return;
+      }
+
+      // Set audio mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        staysActiveInBackground: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
       await audioService.preloadSoundEffects();
       await audioService.loadBackgroundMusic();
       audioService.setInitialized();
@@ -100,6 +118,18 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [gameState]);
+
+  // Function to recalculate goons per click based on current upgrades and prestige
+  const recalculateGoonsPerClick = () => {
+    const baseClickPower = 1;
+    const clickPowerBonus = gameState.upgrades.clickPower.level * 1; // baseMultiplier is 1
+    const totalClickPower = baseClickPower + clickPowerBonus;
+    const correctGoonsPerClick = Math.floor(totalClickPower * gameState.prestige.multiplier);
+    
+    if (correctGoonsPerClick !== gameState.goonsPerClick) {
+      updateGameState({ goonsPerClick: correctGoonsPerClick });
+    }
+  };
 
   // Recalculate goons per click when upgrades or prestige changes
   useEffect(() => {
@@ -174,11 +204,15 @@ export default function App() {
 
   const unlockAchievement = (achievementId: string) => {
     const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
-    if (achievement && !gameState.achievements.find(a => a.id === achievementId)?.unlocked) {
-      const newAchievements = [...gameState.achievements, { ...achievement, unlocked: true }];
+    if (
+      achievement &&
+      !gameState.achievements.some(a => a.id === achievementId)
+    ) {
+      // Play achievement sound effect
+      audioService.playSoundEffect('achievement');
+      
       updateGameState({
-        achievements: newAchievements,
-        goons: gameState.goons + achievement.reward,
+        achievements: [...gameState.achievements, achievement],
       });
       statisticsService.recordAchievement();
       notificationService.notifyAchievement(achievement.name, achievement.reward);
@@ -190,8 +224,9 @@ export default function App() {
       // Play prestige sound effect
       audioService.playSoundEffect('prestige');
       
-      const prestigeMultiplier = Math.floor(Math.log10(gameState.goons / gameState.prestige.goonsRequired)) + 1;
-      const eventMultiplier = getEventMultiplier(gameState.specialEvents, 'prestige');
+      const newPrestigeLevel = gameState.prestige.level + 1;
+      const newMultiplier = gameState.prestige.multiplier + 0.5;
+      const newGoonsRequired = gameState.prestige.goonsRequired * 10;
       
       updateGameState({
         goons: 0,
@@ -210,14 +245,14 @@ export default function App() {
           goonPortal: { level: 0, cost: 500000, multiplier: 10000 },
         },
         prestige: {
-          level: gameState.prestige.level + 1,
+          level: newPrestigeLevel,
           totalPrestige: gameState.prestige.totalPrestige + 1,
-          multiplier: gameState.prestige.multiplier + (prestigeMultiplier * eventMultiplier),
-          goonsRequired: gameState.prestige.goonsRequired * 10,
+          multiplier: newMultiplier,
+          goonsRequired: newGoonsRequired,
         },
       });
       statisticsService.recordPrestige();
-      notificationService.notifyPrestige(gameState.prestige.level + 1, gameState.prestige.multiplier + (prestigeMultiplier * eventMultiplier));
+      notificationService.notifyPrestige(newPrestigeLevel, newMultiplier);
     }
   };
 
@@ -233,6 +268,12 @@ export default function App() {
     console.log('App: Toggling music from', gameState.musicEnabled, 'to', newMusicEnabled);
     updateGameState({ musicEnabled: newMusicEnabled });
     audioService.updateSettings({ musicEnabled: newMusicEnabled });
+    
+    if (newMusicEnabled) {
+      audioService.playBackgroundMusic();
+    } else {
+      audioService.pauseBackgroundMusic();
+    }
   };
 
   const setSoundVolume = (volume: number) => {
@@ -267,18 +308,6 @@ export default function App() {
 
   const changeTheme = (theme: 'dark' | 'light' | 'neon') => {
     updateGameState({ theme });
-  };
-
-  // Function to recalculate goons per click based on current upgrades and prestige
-  const recalculateGoonsPerClick = () => {
-    const baseClickPower = 1;
-    const clickPowerBonus = gameState.upgrades.clickPower.level * 1; // baseMultiplier is 1
-    const totalClickPower = baseClickPower + clickPowerBonus;
-    const correctGoonsPerClick = Math.floor(totalClickPower * gameState.prestige.multiplier);
-    
-    if (correctGoonsPerClick !== gameState.goonsPerClick) {
-      updateGameState({ goonsPerClick: correctGoonsPerClick });
-    }
   };
 
   return (
@@ -354,4 +383,4 @@ export default function App() {
       </GameContext.Provider>
     </SafeAreaProvider>
   );
-} 
+}

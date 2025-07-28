@@ -89,4 +89,78 @@ export interface GameContextType {
   toggleNotifications: () => void;
   toggleParticleEffects: () => void;
   changeTheme: (theme: 'dark' | 'light' | 'neon') => void;
-} 
+}
+
+export interface ThemeColors {
+  primary: string;
+  secondary: string;
+  background: string;
+  surface: string;
+  text: string;
+  textSecondary: string;
+  accent: string;
+  success: string;
+  warning: string;
+  error: string;
+  border: string;
+  shadow: string;
+}
+
+export interface Theme {
+  name: 'dark' | 'light' | 'neon';
+  colors: ThemeColors;
+}
+
+export const THEMES: { [key: string]: Theme } = {
+  dark: {
+    name: 'dark',
+    colors: {
+      primary: '#1a1a2e',
+      secondary: '#16213e',
+      background: '#0f0f23',
+      surface: '#1a1a2e',
+      text: '#ffffff',
+      textSecondary: '#cccccc',
+      accent: '#4CAF50',
+      success: '#4CAF50',
+      warning: '#FF9800',
+      error: '#F44336',
+      border: '#333333',
+      shadow: '#000000',
+    },
+  },
+  light: {
+    name: 'light',
+    colors: {
+      primary: '#ffffff',
+      secondary: '#f5f5f5',
+      background: '#ffffff',
+      surface: '#f9f9f9',
+      text: '#333333',
+      textSecondary: '#666666',
+      accent: '#2196F3',
+      success: '#4CAF50',
+      warning: '#FF9800',
+      error: '#F44336',
+      border: '#e0e0e0',
+      shadow: '#000000',
+    },
+  },
+  neon: {
+    name: 'neon',
+    colors: {
+      primary: '#1a1a2e',
+      secondary: '#16213e',
+      background: '#0a0a0a',
+      surface: '#1a1a2e',
+      text: '#00ff00',
+      textSecondary: '#00cc00',
+      accent: '#ff00ff',
+      success: '#00ff00',
+      warning: '#ffff00',
+      error: '#ff0000',
+      border: '#00ff00',
+      shadow: '#000000',
+    },
+  },
+}; 

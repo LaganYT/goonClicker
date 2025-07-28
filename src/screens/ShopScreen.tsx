@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 // import { Haptics } from 'expo-haptics';
 
 import { useGameContext } from '../context/GameContext';
+import { useTheme } from '../hooks/useTheme';
 import { getEventMultiplier } from '../data/specialEvents';
 import { audioService } from '../services/AudioService';
 import { statisticsService } from '../services/StatisticsService';
@@ -95,6 +96,7 @@ const upgradeData: Record<string, UpgradeItem> = {
 
 export default function ShopScreen() {
   const { gameState, updateGameState } = useGameContext();
+  const { colors } = useTheme();
 
   const formatNumber = (num: number): string => {
     if (num >= 1e12) return `${(num / 1e12).toFixed(1)}T`;
@@ -106,9 +108,9 @@ export default function ShopScreen() {
 
   const calculateUpgradeCost = (upgrade: UpgradeItem): number => {
     const currentLevel = gameState.upgrades[upgrade.key].level;
-    const baseCost = Math.floor(upgrade.baseCost * Math.pow(1.15, currentLevel));
+    // Fix: Use correct event type for getEventMultiplier
     const eventMultiplier = getEventMultiplier(gameState.specialEvents, 'upgrades');
-    return Math.floor(baseCost * eventMultiplier);
+    return Math.floor(upgrade.baseCost * Math.pow(1.15, currentLevel) / eventMultiplier);
   };
 
   const canAffordUpgrade = (upgrade: UpgradeItem): boolean => {
@@ -118,112 +120,152 @@ export default function ShopScreen() {
   const purchaseUpgrade = (upgrade: UpgradeItem) => {
     const cost = calculateUpgradeCost(upgrade);
     
-    if (!canAffordUpgrade(upgrade)) {
-      audioService.playSoundEffect('error');
-      Alert.alert('Not Enough Goons', 'You need more goons to buy this upgrade!');
-      return;
-    }
+    if (gameState.goons >= cost) {
+      // Play upgrade sound effect
+      audioService.playSoundEffect('upgrade');
 
-    // Play upgrade sound effect
-    audioService.playSoundEffect('upgrade');
+      const currentLevel = gameState.upgrades[upgrade.key].level;
+      const newLevel = currentLevel + 1;
+      
+      // Calculate new values
+      let newGoonsPerSecond = gameState.goonsPerSecond;
+      let newGoonsPerClick = gameState.goonsPerClick;
+      
+      if (upgrade.key === 'clickPower') {
+        const baseClickPower = 1;
+        const clickPowerBonus = newLevel * upgrade.baseMultiplier;
+        const totalClickPower = baseClickPower + clickPowerBonus;
+        newGoonsPerClick = Math.floor(totalClickPower * gameState.prestige.multiplier);
+      } else {
+        const eventMultiplier = getEventMultiplier(gameState.specialEvents, 'production');
+        newGoonsPerSecond = gameState.goonsPerSecond + (upgrade.baseMultiplier * gameState.prestige.multiplier * eventMultiplier);
+      }
 
-    // Haptic feedback - disabled for compatibility
-    // try {
-    //   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // } catch (error) {
-    //   // Haptics not available on this platform
-    // }
+      // Update game state
+      updateGameState({
+        goons: gameState.goons - cost,
+        goonsPerSecond: newGoonsPerSecond,
+        goonsPerClick: newGoonsPerClick,
+        upgrades: {
+          ...gameState.upgrades,
+          [upgrade.key]: {
+            ...gameState.upgrades[upgrade.key],
+            level: newLevel,
+            cost: Math.floor(upgrade.baseCost * Math.pow(1.15, newLevel)),
+          },
+        },
+      });
 
-    const newUpgrades = { ...gameState.upgrades };
-    newUpgrades[upgrade.key].level += 1;
-    newUpgrades[upgrade.key].cost = Math.floor(upgrade.baseCost * Math.pow(1.15, newUpgrades[upgrade.key].level));
-
-    let newGoonsPerClick = gameState.goonsPerClick;
-    let newGoonsPerSecond = gameState.goonsPerSecond;
-
-    // Update stats based on upgrade type
-    if (upgrade.key === 'clickPower') {
-      // Calculate total click power: base (1) + click power upgrades, then apply prestige multiplier
-      const baseClickPower = 1;
-      const clickPowerBonus = newUpgrades[upgrade.key].level * upgrade.baseMultiplier;
-      const totalClickPower = baseClickPower + clickPowerBonus;
-      newGoonsPerClick = Math.floor(totalClickPower * gameState.prestige.multiplier);
+      // Update statistics
+      statisticsService.recordUpgradePurchase();
+      notificationService.notifyUpgrade(upgrade.name, newLevel);
     } else {
-      newGoonsPerSecond += upgrade.baseMultiplier;
+      // Play error sound effect
+      audioService.playSoundEffect('error');
+      
+      Alert.alert(
+        'Cannot Afford',
+        `You need ${formatNumber(cost)} goons to purchase this upgrade.`
+      );
     }
-
-    updateGameState({
-      goons: gameState.goons - cost,
-      goonsPerClick: newGoonsPerClick,
-      goonsPerSecond: newGoonsPerSecond,
-      upgrades: newUpgrades,
-    });
-
-    // Record statistics
-    statisticsService.recordUpgradePurchase();
-    statisticsService.updateHighestStats(newGoonsPerSecond, newGoonsPerClick);
-
-    // Send notification
-    notificationService.notifyUpgrade(upgrade.name, newUpgrades[upgrade.key].level);
-
-    Alert.alert('Upgrade Purchased!', `${upgrade.name} upgraded to level ${newUpgrades[upgrade.key].level}!`);
   };
 
   const renderUpgradeItem = (upgrade: UpgradeItem) => {
-    const cost = calculateUpgradeCost(upgrade);
     const currentLevel = gameState.upgrades[upgrade.key].level;
+    const cost = calculateUpgradeCost(upgrade);
     const canAfford = canAffordUpgrade(upgrade);
+    // Fix: Use correct event type for getEventMultiplier
+    const eventMultiplier = getEventMultiplier(gameState.specialEvents, 'upgrades');
+    const hasDiscount = eventMultiplier > 1;
 
     return (
-      <View key={upgrade.key} style={styles.upgradeItem}>
-        <LinearGradient
-          colors={canAfford ? ['#4a90e2', '#357abd'] : ['#666', '#444']}
-          style={styles.upgradeGradient}
-        >
-          <View style={styles.upgradeHeader}>
-            <View style={styles.upgradeIconContainer}>
-              <Ionicons name={upgrade.icon as any} size={24} color="#fff" />
-            </View>
-            <View style={styles.upgradeInfo}>
-              <Text style={styles.upgradeName}>{upgrade.name}</Text>
-              <Text style={styles.upgradeDescription}>{upgrade.description}</Text>
-              <Text style={styles.upgradeLevel}>Level: {currentLevel}</Text>
-            </View>
+      <TouchableOpacity
+        key={upgrade.key}
+        style={[
+          styles.upgradeItem,
+          { backgroundColor: colors.surface },
+          canAfford && { borderColor: colors.accent }
+        ]}
+        onPress={() => purchaseUpgrade(upgrade)}
+        disabled={!canAfford}
+      >
+        <View style={styles.upgradeHeader}>
+          <View style={[styles.upgradeIcon, { backgroundColor: colors.accent }]}>
+            <Ionicons name={upgrade.icon as any} size={24} color={colors.text} />
           </View>
-          
-          <View style={styles.upgradeFooter}>
-            <Text style={styles.upgradeCost}>{formatNumber(cost)} Goons</Text>
-            <TouchableOpacity
-              style={[styles.buyButton, !canAfford && styles.buyButtonDisabled]}
-              onPress={() => purchaseUpgrade(upgrade)}
-              disabled={!canAfford}
-            >
-              <Text style={styles.buyButtonText}>
-                {canAfford ? 'BUY' : 'CAN\'T AFFORD'}
+          <View style={styles.upgradeInfo}>
+            <Text style={[styles.upgradeName, { color: colors.text }]}>{upgrade.name}</Text>
+            <Text style={[styles.upgradeDescription, { color: colors.textSecondary }]}>
+              {upgrade.description}
+            </Text>
+            <Text style={[styles.upgradeLevel, { color: colors.textSecondary }]}>
+              Level {currentLevel}
+            </Text>
+          </View>
+          <View style={styles.upgradeCost}>
+            <Text style={[
+              styles.costText,
+              { color: canAfford ? colors.success : colors.error }
+            ]}>
+              {formatNumber(cost)}
+            </Text>
+            {hasDiscount && (
+              <Text style={[styles.discountText, { color: colors.accent }]}>
+                {eventMultiplier.toFixed(1)}x
               </Text>
-            </TouchableOpacity>
+            )}
           </View>
-        </LinearGradient>
-      </View>
+        </View>
+      </TouchableOpacity>
     );
+  };
+
+  const getGradientColors = (): [string, string, string] => {
+    switch (gameState.theme) {
+      case 'light':
+        return ['#ffffff', '#f5f5f5', '#e0e0e0'];
+      case 'neon':
+        return ['#0a0a0a', '#1a1a2e', '#16213e'];
+      default:
+        return ['#0f0f23', '#1a1a2e', '#16213e'];
+    }
   };
 
   return (
     <LinearGradient
-      colors={['#0f0f23', '#1a1a2e', '#16213e']}
+      colors={getGradientColors()}
       style={styles.container}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Upgrades</Text>
-        <View style={styles.goonDisplay}>
-          <Ionicons name="diamond-outline" size={20} color="#ff6b6b" />
-          <Text style={styles.goonCount}>{formatNumber(gameState.goons)}</Text>
-        </View>
-      </View>
-
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.upgradesContainer}>
-          {Object.values(upgradeData).map(renderUpgradeItem)}
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Upgrades</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+              Purchase upgrades to increase your goon production
+            </Text>
+          </View>
+
+          {/* Current Stats */}
+          <View style={[styles.statsCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.statRow}>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Current Goons:</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{formatNumber(gameState.goons)}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Goons per Second:</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{formatNumber(gameState.goonsPerSecond)}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Goons per Click:</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{formatNumber(gameState.goonsPerClick)}</Text>
+            </View>
+          </View>
+
+          {/* Upgrades List */}
+          <View style={styles.upgradesContainer}>
+            {Object.values(upgradeData).map(renderUpgradeItem)}
+          </View>
         </View>
       </ScrollView>
     </LinearGradient>
@@ -234,61 +276,68 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 15,
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  goonDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  goonCount: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
   scrollView: {
     flex: 1,
   },
-  upgradesContainer: {
+  content: {
     padding: 20,
   },
-  upgradeItem: {
-    marginBottom: 15,
+  header: {
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+  },
+  statsCard: {
+    padding: 20,
     borderRadius: 15,
-    overflow: 'hidden',
-    elevation: 5,
+    marginBottom: 20,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  upgradeGradient: {
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  statLabel: {
+    fontSize: 16,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  upgradesContainer: {
+    gap: 15,
+  },
+  upgradeItem: {
     padding: 20,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   upgradeHeader: {
     flexDirection: 'row',
-    marginBottom: 15,
+    alignItems: 'center',
   },
-  upgradeIconContainer: {
+  upgradeIcon: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -297,42 +346,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   upgradeName: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   upgradeDescription: {
-    color: '#ccc',
     fontSize: 14,
     marginBottom: 4,
   },
   upgradeLevel: {
-    color: '#aaa',
     fontSize: 12,
   },
-  upgradeFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   upgradeCost: {
-    color: '#fff',
-    fontSize: 16,
+    alignItems: 'flex-end',
+  },
+  costText: {
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  buyButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  buyButtonDisabled: {
-    backgroundColor: '#666',
-  },
-  buyButtonText: {
-    color: '#fff',
-    fontSize: 14,
+  discountText: {
+    fontSize: 12,
     fontWeight: 'bold',
+    marginTop: 2,
   },
 }); 

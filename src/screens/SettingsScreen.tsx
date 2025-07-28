@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useGameContext } from '../context/GameContext';
+import { useTheme } from '../hooks/useTheme';
 import { audioService } from '../services/AudioService';
 import { notificationService } from '../services/NotificationService';
 
@@ -30,6 +31,8 @@ export default function SettingsScreen() {
     changeTheme,
     performPrestige 
   } = useGameContext();
+
+  const { colors } = useTheme();
 
   const formatNumber = (num: number): string => {
     if (num >= 1e12) return `${(num / 1e12).toFixed(1)}T`;
@@ -83,13 +86,13 @@ export default function SettingsScreen() {
     subtitle: string,
     rightComponent: React.ReactNode
   ) => (
-    <View style={styles.settingItem}>
-      <View style={styles.settingIcon}>
-        <Ionicons name={icon as any} size={24} color="#fff" />
+    <View style={[styles.settingItem, { backgroundColor: colors.surface }]}>
+      <View style={[styles.settingIcon, { backgroundColor: colors.accent }]}>
+        <Ionicons name={icon as any} size={24} color={colors.text} />
       </View>
       <View style={styles.settingInfo}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        <Text style={styles.settingSubtitle}>{subtitle}</Text>
+        <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
       </View>
       <View style={styles.settingRight}>
         {rightComponent}
@@ -102,29 +105,42 @@ export default function SettingsScreen() {
       key={theme}
       style={[
         styles.themeOption,
-        gameState.theme === theme && styles.themeOptionSelected
+        { backgroundColor: colors.surface },
+        gameState.theme === theme && { backgroundColor: colors.accent }
       ]}
       onPress={() => changeTheme(theme)}
     >
       <Text style={[
         styles.themeOptionText,
-        gameState.theme === theme && styles.themeOptionTextSelected
+        { color: colors.textSecondary },
+        gameState.theme === theme && { color: colors.text }
       ]}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 
+  const getGradientColors = (): [string, string, string] => {
+    switch (gameState.theme) {
+      case 'light':
+        return ['#ffffff', '#f5f5f5', '#e0e0e0'];
+      case 'neon':
+        return ['#0a0a0a', '#1a1a2e', '#16213e'];
+      default:
+        return ['#0f0f23', '#1a1a2e', '#16213e'];
+    }
+  };
+
   return (
     <LinearGradient
-      colors={['#0f0f23', '#1a1a2e', '#16213e']}
+      colors={getGradientColors()}
       style={styles.container}
     >
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Game Settings */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Game Settings</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Game Settings</Text>
             
             {renderSettingItem(
               'volume-high',
@@ -133,8 +149,8 @@ export default function SettingsScreen() {
               <Switch
                 value={gameState.soundEnabled}
                 onValueChange={handleToggleSound}
-                trackColor={{ false: '#666', true: '#4CAF50' }}
-                thumbColor={gameState.soundEnabled ? '#fff' : '#ccc'}
+                trackColor={{ false: colors.border, true: colors.success }}
+                thumbColor={gameState.soundEnabled ? colors.text : colors.textSecondary}
               />
             )}
 
@@ -145,8 +161,8 @@ export default function SettingsScreen() {
               <Switch
                 value={gameState.musicEnabled}
                 onValueChange={handleToggleMusic}
-                trackColor={{ false: '#666', true: '#4CAF50' }}
-                thumbColor={gameState.musicEnabled ? '#fff' : '#ccc'}
+                trackColor={{ false: colors.border, true: colors.success }}
+                thumbColor={gameState.musicEnabled ? colors.text : colors.textSecondary}
               />
             )}
 
@@ -157,8 +173,8 @@ export default function SettingsScreen() {
               <Switch
                 value={gameState.vibrationEnabled}
                 onValueChange={toggleVibration}
-                trackColor={{ false: '#666', true: '#4CAF50' }}
-                thumbColor={gameState.vibrationEnabled ? '#fff' : '#ccc'}
+                trackColor={{ false: colors.border, true: colors.success }}
+                thumbColor={gameState.vibrationEnabled ? colors.text : colors.textSecondary}
               />
             )}
 
@@ -169,8 +185,8 @@ export default function SettingsScreen() {
               <Switch
                 value={gameState.autoSaveEnabled}
                 onValueChange={toggleAutoSave}
-                trackColor={{ false: '#666', true: '#4CAF50' }}
-                thumbColor={gameState.autoSaveEnabled ? '#fff' : '#ccc'}
+                trackColor={{ false: colors.border, true: colors.success }}
+                thumbColor={gameState.autoSaveEnabled ? colors.text : colors.textSecondary}
               />
             )}
 
@@ -181,8 +197,8 @@ export default function SettingsScreen() {
               <Switch
                 value={gameState.notificationsEnabled}
                 onValueChange={toggleNotifications}
-                trackColor={{ false: '#666', true: '#4CAF50' }}
-                thumbColor={gameState.notificationsEnabled ? '#fff' : '#ccc'}
+                trackColor={{ false: colors.border, true: colors.success }}
+                thumbColor={gameState.notificationsEnabled ? colors.text : colors.textSecondary}
               />
             )}
 
@@ -193,59 +209,59 @@ export default function SettingsScreen() {
               <Switch
                 value={gameState.particleEffectsEnabled}
                 onValueChange={toggleParticleEffects}
-                trackColor={{ false: '#666', true: '#4CAF50' }}
-                thumbColor={gameState.particleEffectsEnabled ? '#fff' : '#ccc'}
+                trackColor={{ false: colors.border, true: colors.success }}
+                thumbColor={gameState.particleEffectsEnabled ? colors.text : colors.textSecondary}
               />
             )}
 
             {/* Volume Controls */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingIcon}>
-                <Ionicons name="volume-high" size={24} color="#fff" />
+            <View style={[styles.settingItem, { backgroundColor: colors.surface }]}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.accent }]}>
+                <Ionicons name="volume-high" size={24} color={colors.text} />
               </View>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Sound Volume</Text>
-                <Text style={styles.settingSubtitle}>Adjust sound effects volume</Text>
+                <Text style={[styles.settingTitle, { color: colors.text }]}>Sound Volume</Text>
+                <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>Adjust sound effects volume</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={0}
                   maximumValue={1}
                   value={gameState.soundVolume}
                   onValueChange={handleSetSoundVolume}
-                  minimumTrackTintColor="#4CAF50"
-                  maximumTrackTintColor="#666"
-                  thumbTintColor="#fff"
+                  minimumTrackTintColor={colors.success}
+                  maximumTrackTintColor={colors.border}
+                  thumbTintColor={colors.text}
                 />
               </View>
             </View>
 
-            <View style={styles.settingItem}>
-              <View style={styles.settingIcon}>
-                <Ionicons name="musical-notes" size={24} color="#fff" />
+            <View style={[styles.settingItem, { backgroundColor: colors.surface }]}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.accent }]}>
+                <Ionicons name="musical-notes" size={24} color={colors.text} />
               </View>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Music Volume</Text>
-                <Text style={styles.settingSubtitle}>Adjust background music volume</Text>
+                <Text style={[styles.settingTitle, { color: colors.text }]}>Music Volume</Text>
+                <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>Adjust background music volume</Text>
                 <Slider
                   style={styles.slider}
                   minimumValue={0}
                   maximumValue={1}
                   value={gameState.musicVolume}
                   onValueChange={handleSetMusicVolume}
-                  minimumTrackTintColor="#4CAF50"
-                  maximumTrackTintColor="#666"
-                  thumbTintColor="#fff"
+                  minimumTrackTintColor={colors.success}
+                  maximumTrackTintColor={colors.border}
+                  thumbTintColor={colors.text}
                 />
               </View>
             </View>
 
-            <View style={styles.settingItem}>
-              <View style={styles.settingIcon}>
-                <Ionicons name="color-palette" size={24} color="#fff" />
+            <View style={[styles.settingItem, { backgroundColor: colors.surface }]}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.accent }]}>
+                <Ionicons name="color-palette" size={24} color={colors.text} />
               </View>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Theme</Text>
-                <Text style={styles.settingSubtitle}>Choose your preferred theme</Text>
+                <Text style={[styles.settingTitle, { color: colors.text }]}>Theme</Text>
+                <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>Choose your preferred theme</Text>
               </View>
             </View>
             
@@ -258,7 +274,7 @@ export default function SettingsScreen() {
 
           {/* Prestige Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Prestige</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Prestige</Text>
             
             <View style={styles.prestigeCard}>
               <LinearGradient
@@ -315,60 +331,59 @@ export default function SettingsScreen() {
 
           {/* Game Info */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Game Info</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Game Info</Text>
             
             {renderSettingItem(
               'information-circle',
               'Version',
               'Goon Clicker v1.0.0',
-              <Text style={styles.infoText}>v1.0.0</Text>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>v1.0.0</Text>
             )}
 
             {renderSettingItem(
               'code-slash',
               'Developer',
               'Built with React Native & Expo',
-              <Text style={styles.infoText}>React Native</Text>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>React Native</Text>
             )}
           </View>
 
           {/* Test Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Test Audio (Simplified)</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Test Audio</Text>
             
-            <Text style={styles.infoText}>
-              Audio system is working with simplified implementation. 
-              Check console for audio logs.
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+              Test the audio system with actual sound effects and background music.
             </Text>
             
             <TouchableOpacity
-              style={styles.testButton}
+              style={[styles.testButton, { backgroundColor: colors.accent }]}
               onPress={() => {
                 console.log('Testing audio...');
                 audioService.playSoundEffect('click');
               }}
             >
-              <Text style={styles.testButtonText}>Test Click Sound</Text>
+              <Text style={[styles.testButtonText, { color: colors.text }]}>Test Click Sound</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.testButton}
+              style={[styles.testButton, { backgroundColor: colors.accent }]}
               onPress={() => {
                 console.log('Testing upgrade sound...');
                 audioService.playSoundEffect('upgrade');
               }}
             >
-              <Text style={styles.testButtonText}>Test Upgrade Sound</Text>
+              <Text style={[styles.testButtonText, { color: colors.text }]}>Test Upgrade Sound</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.testButton}
+              style={[styles.testButton, { backgroundColor: colors.accent }]}
               onPress={() => {
                 console.log('Testing background music...');
                 audioService.playBackgroundMusic();
               }}
             >
-              <Text style={styles.testButtonText}>Test Background Music</Text>
+              <Text style={[styles.testButtonText, { color: colors.text }]}>Test Background Music</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -391,7 +406,6 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   sectionTitle: {
-    color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
@@ -399,7 +413,6 @@ const styles = StyleSheet.create({
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
@@ -408,7 +421,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -417,12 +429,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
   settingSubtitle: {
-    color: '#ccc',
     fontSize: 12,
     marginTop: 2,
   },
@@ -430,7 +440,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   infoText: {
-    color: '#ccc',
     fontSize: 14,
   },
   themeOptions: {
@@ -442,18 +451,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  themeOptionSelected: {
-    backgroundColor: '#4CAF50',
   },
   themeOptionText: {
-    color: '#ccc',
     fontSize: 14,
     fontWeight: 'bold',
-  },
-  themeOptionTextSelected: {
-    color: '#fff',
   },
   prestigeCard: {
     borderRadius: 15,
@@ -536,7 +537,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   testButton: {
-    backgroundColor: '#4CAF50',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
@@ -544,7 +544,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   testButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
